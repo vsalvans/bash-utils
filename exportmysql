@@ -1,0 +1,43 @@
+#!/bin/bash
+
+red='\033[0;31m'
+NC='\033[0m' # No Color
+
+
+function _mysqldump {
+	echo -e "Dumping ... ${red}$1${NC}"
+	mysqldump -u${username} -p${password} $item | gzip -c | cat > $folder/$item.sql.gz
+}
+
+echo "Enter MYSQL access"
+echo -n "MYSQL username :"
+read username
+echo -n "MYSQL password :"
+read password
+
+
+if [ ! -z $1 ]; then
+	list=(`cat $1`)
+else 
+	echo -n "Do you want to export all databases instead [y/N]?"
+	read yes
+
+	if [ "$yes" == "y" -o "$yes" == "Y" ]; then
+		list=$(mysql -u${usernamer} -p${password} <<< 'show databases;')
+	fi
+fi
+
+if [ ! -z $list ]; then
+
+	folder="dump-`date +"%d-%m-%Y-%H%M%s"`"
+	echo "All database files will be dumped in $folder";
+
+	mkdir $folder 
+
+	for item in $list; do
+		if [ "$item" != "Database" -a "$item" != "information_schema" ]; then
+			_mysqldump $item $folder
+		fi
+	done
+
+fi

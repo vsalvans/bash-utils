@@ -9,6 +9,7 @@ function _mysqldump {
 	mysqldump -u${username} -p${password} $item | gzip -c | cat > $folder/$item.sql.gz
 }
 
+echo "*********** MYSQL atuomatic dump *********"
 echo "Enter MYSQL access"
 echo -n "MYSQL username :"
 read username
@@ -23,11 +24,15 @@ else
 	read yes
 
 	if [ "$yes" == "y" -o "$yes" == "Y" ]; then
-		list=$(mysql -u${usernamer} -p${password} <<< 'show databases;')
+		list=$(mysql -u${username} -p${password} <<< 'show databases;')
 	fi
 fi
 
-if [ ! -z $list ]; then
+echo "Exporting the following databases:"
+echo $list
+
+
+if [ ! -z "$list" ]; then
 
 	folder="dump-`date +"%d-%m-%Y-%H%M%s"`"
 	echo "All database files will be dumped in $folder";

@@ -1,0 +1,308 @@
+#!/bin/bash
+
+#colors
+red='\033[0;31m'
+NC='\033[0m' # No Color
+
+#set default options
+zipfolder=~/.project/
+
+#remote_user=
+#remote_host=
+#remote_folder=
+repository_name=stage
+#git_folder=
+#remote_drush_folder=
+#remote_dump_folder=
+
+if [[ -f ~/.projectrc ]]; then
+    #load options
+    source ~/.projectrc
+else
+    echo -e "Project config file ~.projectrc  not found\n"
+    echo -e "Some project options may not work\n"
+    echo -e "Create a new file called projectrc in your home folder with the following variables\n"
+    echo "
+    #!/bin/bash
+
+    remote_user=
+    remote_host=
+    remote_folder=
+    repository_name=
+    git_folder=
+    remote_drush_folder=
+    remote_dump_folder=
+
+    "
+fi
+
+function go {
+    cd ~/projects/private/"$1"
+}
+
+function array_contains { 
+    local array="$1[@]"
+    local seeking=$2
+    local in=1
+    for element in "${!array}"; do
+        if [[ $element == $seeking ]]; then
+            in=0
+            break
+        fi
+    done
+    return $in
+}
+
+function commit_and_push {
+
+    echo "Commiting ALL changes ..."
+    git add . --all
+    git commit -m "saving ..."
+    
+    if array_contains repos origin ; then
+        echo "Found origin repository, updating ..."
+        git push origin    
+    fi
+}
+
+case "$1" in
+    open)
+        if [[ ! -d  ~/projects/private/"$2" ]]; then
+            echo "Project ${2} not found"
+            return
+        fi
+        go $2
+        git pull origin
+        subl ~/projects/private/"$2"
+        ;;
+
+    go)
+        if [[ ! -d  ~/projects/private/"$2" ]]; then
+            echo "Project ${2} not found"
+            return
+        fi
+        go $2
+        ;;
+
+    save)
+
+        if [[ ! -d ".git" ]]; then
+            echo "There is no git repository set"
+            return
+        fi
+
+        repos=$(git remote)
+
+        case "$2" in
+            drupal)
+                
+                if [[ ! -d "sites/default" ]]; then
+                    echo "This is not a Drupal root folder"
+                    return
+                fi
+
+                if [[ ! -d "db" ]]; then
+                    echo "creating db folder"
+                    mkdir db
+                fi
+                
+                echo "Exporting database before commiting ..."
+                drush sql-dump | gzip -9 > db/database.sql.gz
+                
+                commit_and_push
+                
+                echo -n "Do you want to copy the sites/default/files folder to USB Storage (y/N)"
+                read yes
+
+                if [[ "$yes" == "y" ]]; then
+
+                    if [[ ! -d /Volumes/USB/exchange/ ]]; then
+                        echo "USB naned USB with exchange folder does not exist"
+                        return
+                    fi
+
+                    project=${PWD##*/}
+                    destination=/Volumes/USB/exchange/${project}/files
+
+                    if [[ ! -d "$destination" ]]; then
+                        echo "Creating ${destination} ..."
+                        mkdir -p "$destination"
+                    fi
+                    cp -R sites/default/files "$destination"
+                fi
+
+                ;;
+            *)
+                commit_and_push
+
+        esac
+
+        ;;
+
+    deploy)
+
+        if [[ ! -d ".git" ]]; then
+            echo "There is no git repository set"
+            return
+        fi
+
+        if [ -z "$2" ]; then
+            echo "You should supply deployment repository name"
+            return
+        fi 
+        
+        if [[ ! -d "../../../projects" ]]; then
+            echo "It seems you are not in a project root folder"
+            return
+        fi
+
+        repos=$(git remote)
+
+        if array_contains repos "$2" ; then
+            
+            commit_and_push
+            
+            git push "$2"
+
+        else
+            echo "The remote repository called ${2} is not found"
+            return
+        fi
+        
+
+        if [[ -d "sites/default" ]]; then
+
+            project=${PWD##*/}
+
+            echo "It looks like this is a Drupal instance"
+            echo -n "do you want to deploy its database too, using drush sql-sync @${project}.dev @${project}.${2} (y/N)?"
+            read yes
+
+            if [[ "$yes" == "y" ]]; then
+                drush sql-sync @${project}.dev @${project}.${2}                
+            fi
+            
+        fi
+
+    ;;
+
+    create)
+ 
+        project=${PWD##*/}
+
+        if [[ ! -d "../../../projects" ]]; then
+            echo "It seems you are not in a project root folder"
+            return
+        fi
+
+        if [[ ! -d "$zipfolder" ]]; then
+            echo "Project zip folder is not set up"
+            echo "creating $zipfolder"
+            mkdir -p $zipfolder
+        fi
+
+        if [[ ! -d ".git" ]]; then
+            echo "There is no git repository set"
+            return
+        fi
+
+        # check databases to export
+        if [[ -f "sites/default/settings.php" ]]; then
+            echo "This is a Drupal root folder"
+            echo "Changing permissions on sites/default folder..."
+            chmod u+w sites/default
+
+            echo "Exporting database..."
+            
+            if [[ ! -d "db" ]]; then
+                echo "creating db folder"
+                mkdir db
+            fi
+                
+            drush sql-dump | gzip -9 > db/database.sql.gz
+        fi
+
+        # create ziped tar ball
+        # step back so tar files will be relative to project folder name
+        cd ..
+        echo "Creating tarball..."
+        tar -czpf ${zipfolder}${project}.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.sass_cache' ${project}
+        if [[ ! $? -eq 0 ]]; then
+            echo "tar -czpf ${zipfolder}${project}.tar.gz --exclude='.git' --exclude='node_modules' --exclude='.sass_cache' ${project}"
+            echo "Error creating tar ball"
+            return
+        fi
+        #step forward so we keen in the project folder     
+        cd $project
+        if [[ -d "sites/default" ]]; then
+            echo "Restoring permissions on sites/default folder..."
+            chmod u-w sites/default
+        fi        
+
+        # upload project at stage server (configurable?)
+        echo "Uploading project..."
+        scp ${zipfolder}/${project}.tar.gz ${remote_user}@${remote_host}:${remote_folder}
+
+        # install project (untar and create git and install database if exists)
+        echo "Installing project..."
+        ssh ${remote_user}@${remote_host} "installprj ${project} ${remote_folder}"
+
+        # add remote repository
+        echo "Configuring remote repository..."
+        git remote add ${repository_name} ssh://${remote_user}@${remote_host}${git_folder}${project}.git
+
+        echo "Updating remote repository..."
+        git add . --all
+        git commit -m 'Before update remote repository'
+        git push ${repository_name} master
+
+        # if drupal create stage alias (configurable?)
+        if [[ -d "sites/default" && ! -f "aliases.drushrc.php" ]]; then
+            echo -n "It seems a Drupal projects, would you like to add a drush alias(y/N)?"
+            read yes
+
+            if [[ "$yes" == "y" ]]; then
+                echo "<?php
+                    \$aliases['${project}.dev'] = array(
+                        'root' => '.',
+                        'path-aliases' => array(
+                            '%dump-dir' => '/Users/vsalvans/projects/private/drush.dumpdbs',
+                            '%files' => 'sites/default/files'
+                        )
+                    );
+
+                    \$aliases['${project}.${repository_name}'] = array(
+                        'root' => '${remote_folder}${project}',
+                        'remote-user' => '${remote_user}',
+                        'remote-host' => '${remote_host}',
+                        'path-aliases' => array(
+                            '%drush-script' => '${remote_drush_folder}',
+                            '%dump-dir' => '${remote_dump_folder}',
+                            '%files' => 'sites/default/files'
+                        )
+                    );
+                    
+                    \$options['shell-aliases']['pull-files'] = '!drush rsync -av --progress @${project}.${repository_name}:%files/ @${project}.dev:%files';
+                    \$options['shell-aliases']['push-files'] = '!drush rsync @${project}.dev:%files/ @${project}.${repository_name}:%files';
+
+                "  > aliases.drushrc.php         
+            fi
+            
+        fi 
+    ;;
+
+    *)
+        echo -e "Usage: 
+${red}go${NC} => It goes to a private project folder
+
+${red}open${NC} => It goes to a private project folder, pulls last origin repository version and opens sublime text
+
+${red}save [project type]${NC} => It commit all changes to local repository if project type is:
+                            drupal =>  export database and add it to local and origin repository, also ask to export /sites/default/files to USB
+${red}deploy [repository]${NC} => Commit all changes to local repository update origin repository (if exists) and push local repository to [repository] repository
+
+${red}create${NC} => Install project to remote server (configuration needed) and creates remote repository to deploy to, also if the project is Drupal, it asks to create an drush alias
+            
+        "
+
+esac

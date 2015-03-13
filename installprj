@@ -1,0 +1,60 @@
+#!/bin/bash
+
+project=$1
+projectfolder=$2
+
+if [[ -f ~/.installprjrc ]]; then
+        echo "Loading configuration..."
+        source ~/.installprjrc
+else
+        echo "Install project configuration file not found"
+        exit 1
+fi
+
+if [[ ! -f ${projectfolder}${project}.tar.gz ]]; then
+        echo "Tarball file ${projectfolder}${project}.tar.gz not found"
+        exit 1
+fi
+
+cd ${projectfolder}
+tar -xzpSf ${project}.tar.gz
+
+if [[ $? -eq 0 ]]; then
+
+        echo "Creating remote repository..."
+
+        mkdir /var/git/${project}.git
+        cd /var/git/${project}.git
+        git init --bare
+
+        echo "#!/bin/sh
+git --work-tree=${projectfolder}${project} --git-dir=/var/git/${project}.git checkout -f " > hooks/post-receive
+
+        chmod u+x hooks/post-receive
+
+        if [[ -f ${projectfolder}${project}/db/database.sql.gz ]]; then
+
+                echo "Installing database..."
+
+                mysql -u${mysqluser} -p${mysqlpwd} <<< "CREATE DATABASE ${project} CHARACTER SET utf8 COLLATE utf8_general_ci;"
+                gunzip -c ${projectfolder}${project}/db/database.sql.gz | mysql -u${mysqluser} -p${mysqlpwd} ${project}
+
+                #detect database configuration
+                if [[ -f ${projectfolder}${project}/sites/default/settings.php ]]; then
+                        #override drupal configuration
+                        echo "Setting drupal database configuration..."
+                        chmod u+w ${projectfolder}${project}/sites/default/settings.php
+                        echo -e "\$databases['default']['default']['database']='${project}';\n" >> ${projectfolder}${project}/sites/default/settings.php
+                        echo -e "\$databases['default']['default']['username']='${mysqluser}';\n" >> ${projectfolder}${project}/sites/default/settings.php
+                        echo -e "\$databases['default']['default']['password']='${mysqlpwd}';\n" >> ${projectfolder}${project}/sites/default/settings.php
+                        chmod u-w ${projectfolder}${project}/sites/default/settings.php
+                fi
+
+
+        else
+                echo "No database found in ${projectfolder}${project}/db/database.sql.gz"
+        fi
+else
+        echo -e "\nError installing project. Check permissions project before uploading\n"
+        exit 1
+fi

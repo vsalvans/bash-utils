@@ -1,5 +1,14 @@
 #!/bin/bash
 
+############
+#
+# It exports all databases of your current mysql server or a list provided by a file used as parameter of this script
+# usage : exportmysql [database_list_file]
+# 
+# All databases are dumped and ziped in a new folder (check permissions) called dump-[current_timestamp]
+# 
+############
+
 red='\033[0;31m'
 NC='\033[0m' # No Color
 
@@ -17,7 +26,7 @@ echo -n "MYSQL password :"
 read password
 
 
-if [ ! -z $1 ]; then
+if [ ! -z "$1" ]; then
 	list=(`cat $1`)
 else 
 	echo -n "Do you want to export all databases instead [y/N]?"
@@ -30,7 +39,6 @@ fi
 
 echo "Exporting the following databases:"
 echo $list
-
 
 if [ ! -z "$list" ]; then
 

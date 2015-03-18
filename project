@@ -7,6 +7,8 @@ NC='\033[0m' # No Color
 #set default options
 zipfolder=~/.project/
 
+webfolder=~/www
+
 #remote_user=
 #remote_host=
 #remote_folder=
@@ -19,7 +21,7 @@ if [[ -f ~/.projectrc ]]; then
     #load options
     source ~/.projectrc
 else
-    echo -e "Project config file ~.projectrc  not found\n"
+    echo -e "Project config file ~/.projectrc  not found\n"
     echo -e "Some project options may not work\n"
     echo -e "Create a new file called projectrc in your home folder with the following variables\n"
     echo "
@@ -289,6 +291,40 @@ case "$1" in
             fi
             
         fi 
+    ;;
+
+    create-host)
+ 
+        project=${PWD##*/}
+
+        if [[ ! -d "../../../projects" ]]; then
+            echo "It seems you are not in a project root folder"
+            return
+        fi
+        
+        echo "Adding soft link at web folder"
+        ln -s  $PWD $webfolder/$project
+
+        echo "Adding host and vhost..."
+        echo -e "\#Adding $project host\n\n127.0.0.1    local.$project.com\n" >> /etc/hosts
+
+        echo -en "A new virtualhost is going to be added, is ${red}local.${project}.com  => ${PWD}${NC}, correct(y/N)?"
+        read yes
+
+        if [[ "$yes" == "y" ]]; then
+        
+            echo "
+    <VirtualHost *:80>
+        DocumentRoot ${PWD}
+        ServerName local.${project}.com
+    </VirtualHost>
+            " >> /etc/apache2/extra/httpd-vhosts.conf
+
+            echo "Restarting apache..."
+            sudo apachectl restart
+            open http://local.${project}.com
+
+        fi
     ;;
 
     *)

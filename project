@@ -16,6 +16,7 @@ repository_name=stage
 #git_folder=
 #remote_drush_folder=
 #remote_dump_folder=
+default_brach=master
 
 if [[ -f ~/.projectrc ]]; then
     #load options
@@ -43,7 +44,8 @@ function go {
 }
 
 function array_contains { 
-    local array="$1[@]"
+    local repos=( $1 )
+    local array=repos[@]
     local seeking=$2
     local in=1
     for element in "${!array}"; do
@@ -61,9 +63,9 @@ function commit_and_push {
     git add . --all
     git commit -m "saving ..."
     
-    if array_contains repos origin ; then
+    if array_contains "$repos" origin ; then
         echo "Found origin repository, updating ..."
-        git push origin    
+        git push origin $default_brach
     fi
 }
 
@@ -160,11 +162,11 @@ case "$1" in
 
         repos=$(git remote)
 
-        if array_contains repos "$2" ; then
+        if array_contains "$repos" "$2" ; then
             
             commit_and_push
             
-            git push "$2"
+            git push "$2" $default_brach
 
         else
             echo "The remote repository called ${2} is not found"
@@ -177,11 +179,11 @@ case "$1" in
             project=${PWD##*/}
 
             echo "It looks like this is a Drupal instance"
-            echo -n "do you want to deploy its database too, using drush sql-sync @${project}.dev @${project}.${2} (y/N)?"
+            echo -n "do you want to deploy its database too, using drush sql-sync @${project}.dev @${project}.${2} --no-cache (y/N)?"
             read yes
 
             if [[ "$yes" == "y" ]]; then
-                drush sql-sync @${project}.dev @${project}.${2}                
+                drush sql-sync @${project}.dev @${project}.${2} --no-cache               
             fi
             
         fi

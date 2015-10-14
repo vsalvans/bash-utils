@@ -165,7 +165,9 @@ case "$1" in
             . deploy.project
         fi
 
-        predeploy $2
+        if [ -n "$(type -t predeploy)" ] && [ "$(type -t predeploy)" = function ]; then
+            predeploy $2
+        fi
 
         repos=$(git remote)
 
@@ -180,7 +182,9 @@ case "$1" in
             return
         fi
 
-        postdeploy $2
+        if [ -n "$(type -t postdeploy)" ] && [ "$(type -t postdeploy)" = function ]; then
+            postdeploy $2
+        fi
         
 
         if [[ -d "sites/default" ]]; then

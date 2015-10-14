@@ -160,6 +160,13 @@ case "$1" in
             return
         fi
 
+        if [[ -f "deploy.project" ]]; then
+            echo "Deploy project file found"
+            . deploy.project
+        fi
+
+        predeploy $2
+
         repos=$(git remote)
 
         if array_contains "$repos" "$2" ; then
@@ -172,6 +179,8 @@ case "$1" in
             echo "The remote repository called ${2} is not found"
             return
         fi
+
+        postdeploy $2
         
 
         if [[ -d "sites/default" ]]; then
@@ -187,6 +196,7 @@ case "$1" in
             fi
             
         fi
+
 
     ;;
 

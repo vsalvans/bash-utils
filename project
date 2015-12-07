@@ -160,6 +160,9 @@ case "$1" in
             return
         fi
 
+        predeloy=""
+        postdeploy=""
+
         if [[ -f "deploy.project" ]]; then
             echo "Deploy project file found"
             . deploy.project

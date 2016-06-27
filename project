@@ -61,7 +61,7 @@ function commit_and_push {
 
     echo "Commiting ALL changes ..."
     git add . --all
-    git commit -m "saving ..."
+    git commit -m "$1"
     
     if array_contains "$repos" origin ; then
         echo "Found origin repository, updating ..."
@@ -113,7 +113,7 @@ case "$1" in
                 echo "Exporting database before commiting ..."
                 drush sql-dump | gzip -9 > db/database.sql.gz
                 
-                commit_and_push
+                commit_and_push "Saving..."
                 
                 echo -n "Do you want to copy the sites/default/files folder to USB Storage (y/N)"
                 read yes
@@ -137,7 +137,7 @@ case "$1" in
 
                 ;;
             *)
-                commit_and_push
+                commit_and_push "$2"
 
         esac
 

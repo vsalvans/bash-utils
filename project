@@ -43,7 +43,7 @@ function go {
     cd ~/projects/private/"$1"
 }
 
-function array_contains { 
+function array_contains {
     local repos=( $1 )
     local array=repos[@]
     local seeking=$2
@@ -62,7 +62,7 @@ function commit_and_push {
     echo "Commiting ALL changes ..."
     git add . --all
     git commit -m "$1"
-    
+
     if array_contains "$repos" origin ; then
         echo "Found origin repository, updating ..."
         git push origin $default_brach
@@ -99,7 +99,7 @@ case "$1" in
 
         case "$2" in
             drupal)
-                
+
                 if [[ ! -d "sites/default" ]]; then
                     echo "This is not a Drupal root folder"
                     return
@@ -109,12 +109,12 @@ case "$1" in
                     echo "creating db folder"
                     mkdir db
                 fi
-                
+
                 echo "Exporting database before commiting ..."
                 drush sql-dump | gzip -9 > db/database.sql.gz
-                
+
                 commit_and_push "Saving..."
-                
+
                 echo -n "Do you want to copy the sites/default/files folder to USB Storage (y/N)"
                 read yes
 
@@ -153,8 +153,8 @@ case "$1" in
         if [ -z "$2" ]; then
             echo "You should supply deployment repository name"
             return
-        fi 
-        
+        fi
+
         if [[ ! -d "../../../projects" ]]; then
             echo "It seems you are not in a project root folder"
             return
@@ -175,9 +175,9 @@ case "$1" in
         repos=$(git remote)
 
         if array_contains "$repos" "$2" ; then
-            
-            commit_and_push
-            
+
+            commit_and_push "Saving to deploy..."
+
             git push "$2" $default_brach
 
         else
@@ -188,7 +188,7 @@ case "$1" in
         if [ -n "$(type -t postdeploy)" ] && [ "$(type -t postdeploy)" = function ]; then
             postdeploy $2
         fi
-        
+
 
         if [[ -d "sites/default" ]]; then
 
@@ -199,16 +199,16 @@ case "$1" in
             read yes
 
             if [[ "$yes" == "y" ]]; then
-                drush sql-sync @${project}.dev @${project}.${2} --no-cache               
+                drush sql-sync @${project}.dev @${project}.${2} --no-cache
             fi
-            
+
         fi
 
 
     ;;
 
     create)
- 
+
         project=${PWD##*/}
 
         if [[ ! -d "../../../projects" ]]; then
@@ -234,12 +234,12 @@ case "$1" in
             chmod u+w sites/default
 
             echo "Exporting database..."
-            
+
             if [[ ! -d "db" ]]; then
                 echo "creating db folder"
                 mkdir db
             fi
-                
+
             drush sql-dump | gzip -9 > db/database.sql.gz
         fi
 
@@ -253,12 +253,12 @@ case "$1" in
             echo "Error creating tar ball"
             return
         fi
-        #step forward so we keen in the project folder     
+        #step forward so we keen in the project folder
         cd $project
         if [[ -d "sites/default" ]]; then
             echo "Restoring permissions on sites/default folder..."
             chmod u-w sites/default
-        fi        
+        fi
 
         # upload project at stage server (configurable?)
         echo "Uploading project..."
@@ -302,25 +302,25 @@ case "$1" in
                             '%files' => 'sites/default/files'
                         )
                     );
-                    
+
                     \$options['shell-aliases']['pull-files'] = '!drush rsync -av --progress @${project}.${repository_name}:%files/ @${project}.dev:%files';
                     \$options['shell-aliases']['push-files'] = '!drush rsync @${project}.dev:%files/ @${project}.${repository_name}:%files';
 
-                "  > aliases.drushrc.php         
+                "  > aliases.drushrc.php
             fi
-            
-        fi 
+
+        fi
     ;;
 
     create-host)
- 
+
         project=${PWD##*/}
 
         if [[ ! -d "../../../projects" ]]; then
             echo "It seems you are not in a project root folder"
             return
         fi
-        
+
         echo "Adding soft link at web folder"
         ln -s  $PWD $webfolder/$project
 
@@ -331,7 +331,7 @@ case "$1" in
         read yes
 
         if [[ "$yes" == "y" ]]; then
-        
+
             echo "
     <VirtualHost *:80>
         DocumentRoot ${PWD}
@@ -347,7 +347,7 @@ case "$1" in
     ;;
 
     *)
-        echo -e "Usage: 
+        echo -e "Usage:
 ${red}go${NC} => It goes to a private project folder
 
 ${red}open${NC} => It goes to a private project folder, pulls last origin repository version and opens sublime text
@@ -357,7 +357,7 @@ ${red}save [project type]${NC} => It commit all changes to local repository if p
 ${red}deploy [repository]${NC} => Commit all changes to local repository update origin repository (if exists) and push local repository to [repository] repository
 
 ${red}create${NC} => Install project to remote server (configuration needed) and creates remote repository to deploy to, also if the project is Drupal, it asks to create an drush alias
-            
+
         "
 
 esac
